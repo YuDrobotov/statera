@@ -1,10 +1,7 @@
 #include "sqlhandler.h"
-#include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlError>
-#include <QtSql/QSqlQuery>
-#include<QList>
 #include<QtWidgets/QMessageBox>
-#include<QObject>
+#include <QVariant>
 #include "wagoninfo.h"
 
 SQLHandler::SQLHandler(QString connectionName,
@@ -54,8 +51,28 @@ QSqlQuery SQLHandler::executeArbitraryQuery(QString query)
     return qr;
 }
 
-QList<WagonInfo> SQLHandler::getAllWagons(int trainID)
+QVector<WagonInfo> SQLHandler::getAllWagons(int trainID, bool closeConnection = true)
 {
-    QSqlQuery query = executeArbitraryQuery("SELECT ALL * from");
+    // Составляем команду и выполняем запрос:
+    QString order = QString("select trains.id, trains.direction, wagons.mass from trains, "
+                            "wagons where trains.id = %1 and wagons.train_id = trains.id;").arg(trainID);
+    QSqlQuery query = executeArbitraryQuery(order);
 
+    // Если необходимо, уничтожаем соединение с БД (по умолчанию, необходимо):
+    if(closeConnection) closeAndDispose();
+
+    // Обрабатываем результат запроса и уничтожаем запрос:
+    QVector<double> massVector = QVector<double>();
+    while (query.next())
+        massVector.append(query.value(2).toDouble());
+    query.clear();
+
+    // Формируем вывод:
+    QVector<WagonInfo> result = QVector<WagonInfo>(massVector.length());
+    for(int i = 0; i < result.length(); i++)
+        result[i] = WagonInfo(massVector[i]);
+
+    // Освобождаем память и возвращаем вывод:
+    massVector.squeeze();
+    return result;
 }

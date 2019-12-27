@@ -22,7 +22,7 @@ public:
     QSqlQuery executeArbitraryQuery(QString query);
 
     /// Получить все вагоны из базы.
-    QList<WagonInfo> getAllWagons(int trainID);
+    QVector<WagonInfo> getAllWagons(int trainID, bool closeConnection);
 
 private:
     /// База данных.
