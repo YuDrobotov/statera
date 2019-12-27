@@ -1,0 +1,61 @@
+class Class{
+  private:
+  QVector<double> *dataDB;
+  int wagonCount;
+ signals:
+ void dataIsLoaded();
+}
+
+
+void Class::getMassDataFromDB(int id, QString hostName, QString dbName, QString userName, QString pswrd)
+{
+    dataDB = new QVector<double>();
+
+    QThread* threadArchive = new QThread();
+    QObject::connect(threadArchive, SIGNAL(finished()), threadArchive, SLOT(deleteLater()));
+    QObject::connect(threadArchive, SIGNAL(finished()), this, SIGNAL(dataIsLoaded()));
+
+    QObject::connect(threadArchive, &QThread::started, [=](){
+        QString name = "my_db_" + QString::number((quint64)QThread::currentThread(), 16);
+        {
+            QSqlDatabase db;
+            if(QSqlDatabase::contains(name))
+                db =  QSqlDatabase::database(name);
+            else {
+                db = QSqlDatabase::addDatabase("QPSQL", name);
+            }
+            db.setHostName(hostName);
+            db.setDatabaseName(dbName);
+            db.setUserName(userName);
+            db.setPassword(pswrd);
+            db.open();
+
+                QString qstr = QString("select trains.id, trains.direction, wagons.mass from trains, wagons where trains.id = %1 and wagons.train_id = trains.id;")
+                        .arg(id);
+
+                QSqlQuery query(db);
+                query.exec(qstr);
+                if ( query.lastError().type() != QSqlError::NoError )
+                {
+                    qDebug() << "Error:" << QString(query.lastError().text());
+                }else{
+                    QVector<double> *massVector = new QVector<double>();
+                    int dir = 1;
+                    while (query.next()) {
+                        dir = query.value(1).toInt();
+                        double mass = query.value(2).toDouble();
+                        massVector->append(mass);
+                    }
+                    dataDB->append(massVector);
+                }
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(name);
+
+        wagonCount =  dataDB->length();
+
+        threadArchive->quit();
+    });
+    threadArchive->start();
+
+}
